@@ -1,12 +1,13 @@
 import Controller from '@ember/controller';
 import { inject } from '@ember/controller';
+import { inject as service} from '@ember/service';
 import { computed } from '@ember/object';
 
 export default Controller.extend({
   applicationController: inject('application'),
   config: computed.reads('applicationController.config'),
   stats: computed.reads('applicationController.model.stats'),
-  intl: inject(),
+  intl: service(),
 
   chartPaymentText: computed('model', {
     get() {

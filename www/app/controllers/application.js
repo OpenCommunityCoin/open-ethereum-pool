@@ -1,6 +1,6 @@
 import Controller from '@ember/controller';
 import { computed } from '@ember/object';
-import { inject } from '@ember/controller';
+import { inject } from '@ember/service';
 import $ from 'jquery';
 import config from '../config/environment';
 

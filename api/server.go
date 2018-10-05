@@ -428,7 +428,7 @@ func (s *ApiServer) Settings(w http.ResponseWriter, r *http.Request) {
 	reply["Donate"] = s.settings["BlockUnlocker"].(map[string]interface{})["Donate"]
 	reply["DonateFee"] = s.settings["BlockUnlocker"].(map[string]interface{})["DonateFee"]
 	reply["DonateAddress"] = s.settings["BlockUnlocker"].(map[string]interface{})["DonateAddress"]
-	reply["KeyTxFees"] = s.settings["BlockUnlocker"].(map[string]interface{})["KeepTxFees"]
+	reply["KeepTxFees"] = s.settings["BlockUnlocker"].(map[string]interface{})["KeepTxFees"]
 	reply["BlockUnlockDepth"] = s.settings["BlockUnlocker"].(map[string]interface{})["Depth"]
 
 	reply["EthProxy"] = s.settings["Proxy"].(map[string]interface{})["Enabled"]

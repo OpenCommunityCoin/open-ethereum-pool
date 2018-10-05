@@ -1,5 +1,4 @@
 import Route from '@ember/routing/route';
-import { later } from '@ember/runloop';
 import $ from 'jquery';
 import Block from "../models/block";
 import config from '../config/environment';

@@ -832,6 +832,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 		tx.ZCard(r.formatKey("blocks", "matured"))
 		tx.ZCard(r.formatKey("payments", "all"))
 		tx.ZRevRangeWithScores(r.formatKey("payments", "all"), 0, maxPayments-1)
+		tx.ZRevRangeWithScores(r.formatKey("payments", "all"), 0, -1)
 		return nil
 	})
 
@@ -856,6 +857,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 	payments := convertPaymentsResults(cmds[10].(*redis.ZSliceCmd))
 	stats["payments"] = payments
 	stats["paymentsTotal"] = cmds[9].(*redis.IntCmd).Val()
+	stats["paymentsAmount"] = convertPaymentAllResults(cmds[11].(*redis.ZSliceCmd))
 
 	totalHashrate, miners := convertMinersStats(window, cmds[1].(*redis.ZSliceCmd))
 	stats["miners"] = miners
@@ -1142,6 +1144,21 @@ func convertMinersStats(window int64, raw *redis.ZSliceCmd) (int64, map[string]M
 		miners[id] = miner
 	}
 	return totalHashrate, miners
+}
+
+func convertPaymentAllResults(raw *redis.ZSliceCmd) int64 {
+	var payment, amount int64
+	for _, v := range raw.Val() {
+		fields := strings.Split(v.Member.(string), ":")
+		// Individual or whole payments row
+		if len(fields) < 3 {
+			amount, _ = strconv.ParseInt(fields[1], 10, 64)
+		} else {
+			amount, _ = strconv.ParseInt(fields[2], 10, 64)
+		}
+		payment += amount
+	}
+	return payment
 }
 
 func convertPaymentsResults(raw *redis.ZSliceCmd) []map[string]interface{} {

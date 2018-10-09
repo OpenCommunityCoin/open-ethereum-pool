@@ -56,15 +56,15 @@ export default Controller.extend({
                     ordinal: false,
                     type: "datetime",
                     dateTimeLabelFormats: {
-                        day: "%e. %b",
-                        week: "%e. %b",
+                        day: "%m/%d",
+                        week: "%m/%d",
                         month: "%b '%y",
                         year: "%Y"
                     }
                 },
                 yAxis: {
                     title: {
-                        text: "Payment by Account"
+                        text: "Amount"
                     }
                 },
                 plotLines: [{
@@ -72,12 +72,19 @@ export default Controller.extend({
                     width: 1,
                     color: "#808080"
                 }],
+                plotOptions: {
+                    series: {
+                        borderColor: 'none'
+                    }
+                },
                 legend: {
-                    enabled: true
+                    enabled: false,
+                    itemStyle: {},
                 },
                 tooltip: {
                     formatter: function() {
-                        return "<b>" + Highcharts.dateFormat('%Y-%m-%d', new Date(this.x)) + "<b><br>Payment&nbsp;<b>" + this.y.toFixed(4) + "&nbsp;" + e.get('config.Unit') + "</b>";
+                        return "<b>" + this.y.toFixed(4) + "&nbsp;" + e.get('config.Unit') + "</b><br />" +
+                            "<b>" + this.x.toISOString().slice(0, 10) + "</b>";
                     },
                     useHTML: true
                 },
@@ -86,7 +93,7 @@ export default Controller.extend({
                 },
                 series: [{
                     color: "#E99002",
-                    name: "Payment Series",
+                    name: "Payments",
                     data: function() {
                         var a = [];
                         if (null != t) {
@@ -108,6 +115,17 @@ export default Controller.extend({
                     }()
                 }]
             };
+            a.chart.backgroundColor = this.getWithDefault('config.highcharts.account.backgroundColor', "transparent");
+            a.series[0].color = this.getWithDefault('config.highcharts.account.color', ['#E99002'])[0];
+            a.xAxis.lineColor = this.getWithDefault('config.highcharts.account.lineColor', "#ccd6eb");
+            a.yAxis.lineColor = this.getWithDefault('config.highcharts.account.lineColor', "#ccd6eb");
+            a.xAxis.tickColor = this.getWithDefault('config.highcharts.account.tickColor', "#ccd6eb");
+            a.yAxis.tickColor = this.getWithDefault('config.highcharts.account.tickColor', "#ccd6eb");
+            a.xAxis.gridLineColor = this.getWithDefault('config.highcharts.account.gridLineColor', "#e6e6e6");
+            a.yAxis.gridLineColor = this.getWithDefault('config.highcharts.account.gridLineColor', "#e6e6e6");
+            a.xAxis.gridLineWidth = this.getWithDefault('config.highcharts.account.gridLineWidthX', "0");
+            a.yAxis.gridLineWidth = this.getWithDefault('config.highcharts.account.gridLineWidthY', "1");
+            a.legend.itemStyle.color = this.getWithDefault('config.highcharts.account.labelColor', "#fff");
         return a;
     }
 })

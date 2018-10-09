@@ -4,9 +4,8 @@ import { computed } from '@ember/object';
 
 export default Controller.extend({
   applicationController: inject('application'),
-  stats: computed.reads('applicationController.model.stats'),
+  stats: computed.reads('applicationController'),
   config: computed.reads('applicationController.config'),
-  stats: computed.reads('applicationController.model.stats'),
   hashrate: computed.reads('applicationController.hashrate'),
   chartOptions: computed("model.hashrate", {
         get() {
@@ -162,9 +161,11 @@ export default Controller.extend({
     }
   }),
 
-  earnPerDay: computed('model', {
+  earnPerDay: computed('model', 'stats', {
     get() {
-      return 24 * 60 * 60 / this.get('config').BlockTime * this.get('config').BlockReward *
+      let reward = this.getWithDefault('stats.blockReward', this.get('config').BlockReward);
+      let blocktime = this.getWithDefault('stats.blockTime', this.get('config').BlockTime);
+      return 24 * 60 * 60 / blocktime * reward *
         this.getWithDefault('model.hashrate') / this.get('hashrate');
     }
   })

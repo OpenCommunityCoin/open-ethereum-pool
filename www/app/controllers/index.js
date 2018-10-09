@@ -148,7 +148,19 @@ export default Controller.extend({
                             }
                         },
                         ordinal: false,
-                        type: "datetime"
+                        type: "datetime",
+                        dateTimeLabelFormats: {
+                            millisecond: "%H:%M:%S",
+                            second: "%H:%M:%S",
+                            minute: "%H:%M",
+                            hour: "%H:%M",
+                            day: "%m/%d",
+                            week: "%m/%d",
+                            month: "%b '%y",
+                            year: "%Y"
+                        },
+                        gridLineWidth: 1,
+                        gridLineColor: "#e6e6e6"
                     },
                     yAxis: {
                         title: {
@@ -157,12 +169,13 @@ export default Controller.extend({
                                 color: "#000"
                             }
                         },
-                        min: 0,
                         labels: {
                             style: {
                                 color: "#000"
                             }
-                        }
+                        },
+                        gridLineWidth: 1,
+                        gridLineColor: "#e6e6e6"
                     },
                     plotLines: [{
                         value: 0,
@@ -174,16 +187,34 @@ export default Controller.extend({
                     },
                     tooltip: {
                         formatter: function() {
-                            return this.y > 1000000000000 ? "<b>" + this.point.d + "<b><br>Hashrate&nbsp;" + (this.y / 1000000000000).toFixed(2) + "&nbsp;TH/s</b>" : this.y > 1000000000 ? "<b>" + this.point.d + "<b><br>Hashrate&nbsp;" + (this.y / 1000000000).toFixed(2) + "&nbsp;GH/s</b>" : this.y > 1000000 ? "<b>" + this.point.d + "<b><br>Hashrate&nbsp;" + (this.y / 1000000).toFixed(2) + "&nbsp;MH/s</b>" : "<b>" + this.point.d + "<b><br>Hashrate<b>&nbsp;" + this.y.toFixed(2) + "&nbsp;H/s</b>";
+                            function scale(v) {
+                                var f = v;
+                                var units = ['', 'K', 'M', 'G', 'T'];
+                                for (var i = 0; i < 5 && f > 1000; i++)  {
+                                    f /= 1000;
+                                }
+                                return f.toFixed(2) + ' ' + units[i];
+                            }
+                            var h = scale(this.point.y);
+
+                            return "<b>" + this.point.d + "</b><br />" +
+                                "<b>Hashrate&nbsp;" + h + "H/s</b>";
                         },
                         useHTML: true
                     },
                     exporting: {
                         enabled: false
                     },
+                    plotOptions: {
+                        line: {
+                            pointInterval: 5
+                        },
+                        pointInterval:10
+                    },
                     series: [{
                         color: "#15BD27",
                         name: "Hashrate",
+                        shadow: true,
                         data: function() {
                             var a = [];
                             if (null != t) {
@@ -205,11 +236,23 @@ export default Controller.extend({
                         }()
                     }]
                 };
-            a.title.text = this.get('config.highcharts.main.title') || "";
-            a.yAxis.title.text = this.get('config.highcharts.main.ytitle') || "Pool Hashrate";
-            a.chart.height = this.get('config.highcharts.main.height') || 300;
-            a.chart.type = this.get('config.highcharts.main.type') || 'spline';
-            a.series[0].color = this.get('config.highcharts.main.color') || '#15b7bd';
+            a.title.text = this.getWithDefault('config.highcharts.main.title', "");
+            a.yAxis.title.text = this.getWithDefault('config.highcharts.main.ytitle', "Pool Hashrate");
+            a.chart.height = this.getWithDefault('config.highcharts.main.height', 300);
+            a.chart.type = this.getWithDefault('config.highcharts.main.type', 'spline');
+            a.chart.backgroundColor = this.getWithDefault('config.highcharts.main.backgroundColor', "rgba(255, 255, 255, 0.1)");
+            a.xAxis.labels.style.color = this.getWithDefault('config.highcharts.main.labelColor', "#000");
+            a.yAxis.labels.style.color = this.getWithDefault('config.highcharts.main.labelColor', "#000");
+            a.yAxis.title.style.color = this.getWithDefault('config.highcharts.main.labelColor', "#000");
+            a.xAxis.gridLineColor = this.getWithDefault('config.highcharts.main.gridLineColor', "#e6e6e6");
+            a.yAxis.gridLineColor = this.getWithDefault('config.highcharts.main.gridLineColor', "#e6e6e6");
+            a.xAxis.gridLineWidth = this.getWithDefault('config.highcharts.main.gridLineWidthX', "0");
+            a.yAxis.gridLineWidth = this.getWithDefault('config.highcharts.main.gridLineWidthY', "1");
+            a.xAxis.lineColor = this.getWithDefault('config.highcharts.main.lineColor', "#ccd6eb");
+            a.yAxis.lineColor = this.getWithDefault('config.highcharts.main.lineColor', "#ccd6eb");
+            a.xAxis.tickColor = this.getWithDefault('config.highcharts.main.tickColor', "#ccd6eb");
+            a.yAxis.tickColor = this.getWithDefault('config.highcharts.main.tickColor', "#ccd6eb");
+            a.series[0].color = this.getWithDefault('config.highcharts.main.color', '#15b7bd');
             return a;
         }
     })

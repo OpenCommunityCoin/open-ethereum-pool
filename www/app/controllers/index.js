@@ -113,15 +113,23 @@ export default Controller.extend({
                         events: {
                             load: function() {
                                 var self = this;
-                                setInterval(function() {
+                                var chartInterval = setInterval(function() {
                                     if (!self.series) {
-                                        return; // FIXME
+                                        clearInterval(chartInterval);
+                                        return;
                                     }
                                     var series = self.series[0];
                                     var now = new Date();
+
                                     var shift = false;
-                                    if (series && series.data && now - series.data[0].x > 6*60*60*1000) {
+                                    // partially update chart
+                                    if (now - series.data[0].x > 18*60*60*1000) {
+                                        // show 18 hours ~ 15(min) * 74(points) ~ poolChartsNum: 74, poolChars: "0 */15 ..."
                                         shift = true;
+                                    }
+                                    // check latest added temporary point and remove tempory added point for less than 5 minutes
+                                    if (series.data.length > 1 && series.data[series.data.length - 1].x - series.data[series.data.length - 2].x < 5*60*1000) {
+                                        series.removePoint(series.data.length - 1, false, false);
                                     }
                                     var x = now, y = e.getWithDefault("model.hashrate");
                                     var d = x.toLocaleString();

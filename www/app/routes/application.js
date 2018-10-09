@@ -37,6 +37,7 @@ export default Route.extend({
   poolCharts: null,
   chartTimestamp: 0,
   priceInfo: null,
+  ratioInfo: null,
   priceTimestamp: 0,
   currencies: null,
   selectedCurrency: null,
@@ -95,7 +96,7 @@ export default Route.extend({
 
     let price = this.get('priceInfo');
     let needUpdatePrice = new Date().getTime() - this.getWithDefault('priceTimestamp', 0) > (config.APP.priceInterval || 3*60000 /* 3 min */);
-    if ((needUpdatePrice || !price) && config.APP.priceApiUrl) {
+    if ((needUpdatePrice || !price) && config.APP.priceApiType) {
       let self = this;
       let url = config.APP.priceApiUrl;
 
@@ -104,6 +105,20 @@ export default Route.extend({
           self.set('priceInfo', price);
           self.set('priceTimestamp', new Date().getTime());
           console.log('INFO: price info loaded..');
+      });
+    }
+
+    let ratio = this.get('ratioInfo');
+    let needUpdateRatio = new Date().getTime() - this.getWithDefault('ratioTimestamp', 0) > (config.APP.priceInterval || 3*60000 /* 3 min */);
+    if ((needUpdateRatio || !ratio) && config.APP.ratioApiUrl) {
+      let self = this;
+      let url = config.APP.ratioApiUrl;
+
+      $.getJSON(url).then(function(data) {
+        price = EmberObject.create(data);
+        self.set('ratioInfo', price);
+        self.set('ratioTimestamp', new Date().getTime());
+        console.log('INFO: ratio info loaded..');
       });
     }
 
@@ -142,12 +157,27 @@ export default Route.extend({
           var symbol = config.APP.currencies[currency];
           $('#selectedCurrency').html(symbol + '<b class="caret"></b>');
           var price = this.get('priceInfo');
-          if (price && price[currency]) {
-            currency = price[currency];
-            var parsed = parseFloat(currency).toFixed(3);
-            $('#currentPrice').html(parsed);
-          } else {
-            $('#currentPrice').html('--');
+          if (config.APP.priceApiType === 'coinmarketcap') {
+            // coinmarketcap case
+            if (price && price[0]['price_'+currency.toLowerCase()]) {
+              currency = price[0]['price_'+currency.toLowerCase()];
+              var parsed = parseFloat(currency).toFixed(3);
+              $('#currentPrice').html(parsed);
+            } else if (config.APP.ratioApiUrl) {
+              var ratio = this.get('ratioInfo');
+              currency = parseFloat(ratio[currency]) * parseFloat(price[0]['price_btc']);
+              var parsed = parseFloat(currency).toFixed(5);
+              $('#currentPrice').html(parsed);
+            }
+          } else if (config.APP.priceApiType === 'cryptocompare') {
+            // cryptocompare case
+            if (price && price[currency]) {
+              currency = price[currency];
+              var parsed = parseFloat(currency).toFixed(3);
+              $('#currentPrice').html(parsed);
+            } else {
+              $('#currentPrice').html('--');
+            }
           }
           break;
         }
@@ -187,6 +217,7 @@ export default Route.extend({
     model.currencies = config.APP.currencies;
     model.selectedCurrency = this.get('selectedCurrency');
     model.priceInfo = this.get('priceInfo');
+    model.ratioInfo = this.get('ratioInfo');
     this._super(controller, model);
     later(this, this.refresh, 5000);
   }

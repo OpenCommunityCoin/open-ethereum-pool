@@ -35,9 +35,23 @@ export default Controller.extend({
         return '--';
       }
       var curr = this.getWithDefault('stats.model.selectedCurrency', 'USD');
-      var selected = price[curr];
-      var symbol = this.get('currencies')[curr];
-      return parseFloat(selected).toFixed(3);
+      if (this.get('config').priceApiType === 'coinmarketcap') {
+        // coinmarketcap
+        if (price[0]['price_' + curr.toLowerCase()]) {
+          return parseFloat(price[0]['price_'+curr.toLowerCase()]).toFixed(4);
+        } else if (this.get('config').ratioApiUrl) {
+          var ratio = this.get('stats.model.ratioInfo');
+          if (ratio) {
+            var currency = parseFloat(ratio[curr]) * parseFloat(price[0]['price_btc']);
+            return parseFloat(currency).toFixed(5);
+          }
+        }
+      } else if (this.get('config').priceApiType === 'cryptocompare') {
+        // cryptocompare
+        var selected = price[curr];
+        return parseFloat(selected).toFixed(3);
+      }
+      return '---';
     }
   }),
 
@@ -47,8 +61,30 @@ export default Controller.extend({
       if (price === null) {
         return '--';
       }
-      var btc = price['BTC'];
-      return parseFloat(btc).toFixed(8);
+      if (this.get('config').priceApiType === 'coinmarketcap' && price[0]['price_btc']) {
+        var btc = price[0]['price_btc'];
+        return parseFloat(btc).toFixed(3);
+      } else if (this.get('config').priceApiType === 'cryptocompare') {
+        var btc = price['BTC'];
+        return parseFloat(btc).toFixed(3);
+      }
+      return '---';
+    }
+  }),
+  satPrice: computed('stats.model', {
+    get() {
+      var price = this.get('stats.model.priceInfo');
+      if (price === null) {
+        return '--';
+      }
+      if (this.get('config').priceApiType === 'coinmarketcap' && price[0]['price_btc']) {
+        var btc = parseFloat(price[0]['price_btc']) * 100000000;
+        return btc.toFixed(3);
+      } else if (this.get('config').priceApiType === 'cryptocompare' && price['BTC']) {
+        var btc = parseFloat(price['BTC']) * 100000000;
+        return btc.toFixed(3);
+      }
+      return '---';
     }
   }),
   LastBlockFound: computed('stats', {

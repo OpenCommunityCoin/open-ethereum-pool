@@ -21,10 +21,11 @@ export default Controller.extend({
                         events: {
                             load: function() {
                                 var self = this;
-                                setInterval(function() {
+                                var chartInterval = setInterval(function() {
                                     var series = self.series;
                                     if (!series) {
-                                        return; // FIXME
+                                        clearInterval(chartInterval);
+                                        return;
                                     }
                                     var now = new Date();
                                     var shift = false;

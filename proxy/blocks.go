@@ -105,7 +105,13 @@ func (s *ProxyServer) fetchBlockTemplate() {
 	log.Printf("New block to mine on %s at height %d / %s / %d", r.Name, height, reply[0][0:10], diff)
 
 	// Stratum
+	// BUG: NiceHash jobs shouldn't be sent as Stratum and vice versa
+	// for now I'm only interested in NiceHash and don't have time or any interest to fix it.
 	if s.config.Proxy.Stratum.Enabled {
 		go s.broadcastNewJobs()
+	}
+
+	if s.config.Proxy.StratumNiceHash.Enabled{
+		go s.broadcastNewJobsNH()
 	}
 }

@@ -8,6 +8,12 @@ type JSONRpcReq struct {
 	Params json.RawMessage `json:"params"`
 }
 
+type JSONRpcReqNH struct  {
+	Method string      `json:"method"`
+	Params interface{} `json:"params"`
+	Id     interface{} `json:"id"`
+}
+
 type StratumReq struct {
 	JSONRpcReq
 	Worker string `json:"worker"`
@@ -26,6 +32,12 @@ type JSONRpcResp struct {
 	Version string          `json:"jsonrpc"`
 	Result  interface{}     `json:"result"`
 	Error   interface{}     `json:"error,omitempty"`
+}
+
+type JSONRpcRespNH struct {
+	Id      json.RawMessage `json:"id"`
+	Result  interface{}     `json:"result"`
+	Error   interface{}     `json:"error"`
 }
 
 type SubmitReply struct {

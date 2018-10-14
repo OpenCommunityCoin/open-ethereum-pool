@@ -6,19 +6,50 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	//_"github.com/davecgh/go-spew/spew"
 
-	"github.com/ethereum/ethash"
+	"github.com/wfr/ethash-nh"
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/sammy007/open-ethereum-pool/util"
 )
 
 var hasher = ethash.New()
 
-func (s *ProxyServer) processShare(login, id, ip string, t *BlockTemplate, params []string) (bool, bool, error) {
+func (s *ProxyServer) processShare(login, id, ip string, t *BlockTemplate, params []string, nicehash bool) (bool, bool, error) {
 	nonceHex := params[0]
 	hashNoNonce := params[1]
 	mixDigest := params[2]
 	nonce, _ := strconv.ParseUint(strings.Replace(nonceHex, "0x", "", -1), 16, 64)
 	shareDiff := s.config.Proxy.Difficulty
+
+	if nicehash {
+		hashNoNonceTmp := common.HexToHash(params[2])
+
+		// Block "difficulty" is BigInt
+		// NiceHash "difficulty" is float64 ...
+		// diffFloat => target; then: diffInt = 2^256 / target
+
+		shareDiffFloat, mixDigestTmp := hasher.GetShareDiff(t.Height, hashNoNonceTmp, nonce)
+		// temporary
+		if shareDiffFloat < 0.0001 {
+			log.Printf("share difficulty too low, %f < %d, from %v@%v", shareDiffFloat, t.Difficulty, login, ip)
+			return false, false, nil
+		}
+		// temporary hack, ignore round errors
+		shareDiffFloat = shareDiffFloat * 0.98
+
+		shareDiff_big := util.DiffFloatToDiffInt(shareDiffFloat)
+		shareDiffCalc := shareDiff_big.Int64()
+
+		log.Printf(">>> hashNoNonce = %v, mixDigest = %v, shareDiff = %v, sharedFloat = %v\n",
+			hashNoNonceTmp.Hex(), mixDigestTmp.Hex(), shareDiffCalc, shareDiffFloat)
+
+		params[1] = hashNoNonceTmp.Hex()
+		params[2] = mixDigestTmp.Hex()
+		hashNoNonce = params[1]
+		mixDigest = params[2]
+	}
 
 	h, ok := t.headers[hashNoNonce]
 	if !ok {

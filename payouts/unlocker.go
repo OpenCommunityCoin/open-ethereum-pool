@@ -84,6 +84,16 @@ func NewBlockUnlocker(cfg *UnlockerConfig, backend *storage.RedisClient) *BlockU
 		log.Printf("Set byzantiumHardForkHeight(not used) to %v", byzantiumHardForkHeight)
 		log.Printf("Set homesteadReward(not used) to %v", homesteadReward)
 		log.Printf("Set byzantiumReward(CLO reward) to %v", byzantiumReward)
+	} else if block.Hash == "0x4d7df65052bb21264d6ad2d6fe2d5578a36be12f71bf8d0559b0c15c4dc539b5" {
+		// Ellaism Network
+		log.Printf("Found genesis.hash is %v", block.Hash)
+		byzantiumHardForkHeight = 10000000
+		byzantiumReward = math.MustParseBig256("4000000000000000000")
+
+		log.Printf("Set byzantiumHardForkHeight to %v", byzantiumHardForkHeight)
+		log.Printf("Set homesteadReward to %v", homesteadReward)
+		log.Printf("Set byzantiumReward to %v", byzantiumReward)
+		getUncleReward = ellaismUncleReward
 	}
 	return u
 }
@@ -535,16 +545,31 @@ func GetConstReward(height int64) *big.Int {
 	return new(big.Int).Set(homesteadReward)
 }
 
+// default getUncleReward
+var getUncleReward func(int64, int64) *big.Int = defaultUncleReward
+
 func getRewardForUncle(height int64) *big.Int {
 	reward := GetConstReward(height)
 	return new(big.Int).Div(reward, new(big.Int).SetInt64(32))
 }
 
-func getUncleReward(uHeight, height int64) *big.Int {
+func defaultUncleReward(uHeight, height int64) *big.Int {
 	reward := GetConstReward(height)
 	k := height - uHeight
 	reward.Mul(big.NewInt(8-k), reward)
 	reward.Div(reward, big.NewInt(8))
+	return reward
+}
+
+func ellaismUncleReward(uHeight, height int64) *big.Int {
+	reward := GetConstReward(height)
+	if height > byzantiumHardForkHeight {
+		reward.Div(reward, big.NewInt(32))
+	} else {
+		k := height - uHeight
+		reward.Mul(big.NewInt(8-k), reward)
+		reward.Div(reward, big.NewInt(8))
+	}
 	return reward
 }
 

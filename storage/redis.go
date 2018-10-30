@@ -22,6 +22,7 @@ type Config struct {
 type RedisClient struct {
 	client *redis.Client
 	prefix string
+	pplns  int64
 }
 
 type BlockData struct {
@@ -78,14 +79,14 @@ type Worker struct {
 	TotalHR int64 `json:"hr2"`
 }
 
-func NewRedisClient(cfg *Config, prefix string) *RedisClient {
+func NewRedisClient(cfg *Config, prefix string, pplns int64) *RedisClient {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.Endpoint,
 		Password: cfg.Password,
 		DB:       cfg.Database,
 		PoolSize: cfg.PoolSize,
 	})
-	return &RedisClient{client: client, prefix: prefix}
+	return &RedisClient{client: client, prefix: prefix, pplns: pplns}
 }
 
 func (r *RedisClient) Client() *redis.Client {
@@ -212,12 +213,33 @@ func (r *RedisClient) WriteBlock(login, id string, params []string, diff, roundD
 		tx.HIncrBy(r.formatKey("miners", login), "blocksFound", 1)
 		tx.Rename(r.formatKey("shares", "roundCurrent"), r.formatRound(int64(height), params[0]))
 		tx.HGetAllMap(r.formatRound(int64(height), params[0]))
+		tx.LRange(r.formatKey("lastshares"), 0, r.pplns)
 		return nil
 	})
 	if err != nil {
 		return false, err
 	} else {
-		sharesMap, _ := cmds[10].(*redis.StringStringMapCmd).Result()
+		lastshares := cmds[len(cmds)-1].(*redis.StringSliceCmd).Val()
+
+		totalnshares := make(map[string]int64)
+		for _, val := range lastshares {
+			totalnshares[val] += 1
+		}
+
+		ntx := r.client.Multi()
+		defer ntx.Close()
+
+		_, err := ntx.Exec(func() error {
+			for k, v := range totalnshares {
+				ntx.HIncrBy(r.formatNShare(int64(height), params[0]), k, v)
+			}
+			return nil
+		})
+		if err != nil {
+			return false, err
+		}
+
+		sharesMap, _ := cmds[len(cmds)-2].(*redis.StringStringMapCmd).Result()
 		totalShares := int64(0)
 		for _, v := range sharesMap {
 			n, _ := strconv.ParseInt(v, 10, 64)
@@ -231,6 +253,9 @@ func (r *RedisClient) WriteBlock(login, id string, params []string, diff, roundD
 }
 
 func (r *RedisClient) writeShare(tx *redis.Multi, ms, ts int64, login, id string, diff int64, expire time.Duration) {
+	tx.LPush(r.formatKey("lastshares"), login)
+	tx.LTrim(r.formatKey("lastshares"), 0, r.pplns)
+
 	tx.HIncrBy(r.formatKey("shares", "roundCurrent"), login, diff)
 	tx.ZAdd(r.formatKey("hashrate"), redis.Z{Score: float64(ts), Member: join(diff, login, id, ms)})
 	tx.ZAdd(r.formatKey("hashrate", login), redis.Z{Score: float64(ts), Member: join(diff, id, ms)})
@@ -244,6 +269,10 @@ func (r *RedisClient) formatKey(args ...interface{}) string {
 
 func (r *RedisClient) formatRound(height int64, nonce string) string {
 	return r.formatKey("shares", "round"+strconv.FormatInt(height, 10), nonce)
+}
+
+func (r *RedisClient) formatNShare(height int64, nonce string) string {
+	return r.formatKey("nshares", "round"+strconv.FormatInt(height, 10), nonce)
 }
 
 func join(args ...interface{}) string {
@@ -268,6 +297,13 @@ func join(args ...interface{}) string {
 			n := v.(*big.Int)
 			if n != nil {
 				s[i] = n.String()
+			} else {
+				s[i] = "0"
+			}
+		case *big.Rat:
+			x := v.(*big.Rat)
+			if x != nil {
+				s[i] = x.FloatString(9)
 			} else {
 				s[i] = "0"
 			}
@@ -299,6 +335,20 @@ func (r *RedisClient) GetImmatureBlocks(maxHeight int64) ([]*BlockData, error) {
 func (r *RedisClient) GetRoundShares(height int64, nonce string) (map[string]int64, error) {
 	result := make(map[string]int64)
 	cmd := r.client.HGetAllMap(r.formatRound(height, nonce))
+	if cmd.Err() != nil {
+		return nil, cmd.Err()
+	}
+	sharesMap, _ := cmd.Result()
+	for login, v := range sharesMap {
+		n, _ := strconv.ParseInt(v, 10, 64)
+		result[login] = n
+	}
+	return result, nil
+}
+
+func (r *RedisClient) GetNShares(height int64, nonce string) (map[string]int64, error) {
+	result := make(map[string]int64)
+	cmd := r.client.HGetAllMap(r.formatNShare(height, nonce))
 	if cmd.Err() != nil {
 		return nil, cmd.Err()
 	}
@@ -552,6 +602,7 @@ func (r *RedisClient) writeImmatureBlock(tx *redis.Multi, block *BlockData) {
 	// Redis 2.8.x returns "ERR source and destination objects are the same"
 	if block.Height != block.RoundHeight {
 		tx.Rename(r.formatRound(block.RoundHeight, block.Nonce), r.formatRound(block.Height, block.Nonce))
+		tx.Rename(r.formatNShare(block.RoundHeight, block.Nonce), r.formatNShare(block.Height, block.Nonce))
 	}
 	tx.ZRem(r.formatKey("blocks", "candidates"), block.candidateKey)
 	tx.ZAdd(r.formatKey("blocks", "immature"), redis.Z{Score: float64(block.Height), Member: block.key()})
@@ -559,6 +610,7 @@ func (r *RedisClient) writeImmatureBlock(tx *redis.Multi, block *BlockData) {
 
 func (r *RedisClient) writeMaturedBlock(tx *redis.Multi, block *BlockData) {
 	tx.Del(r.formatRound(block.RoundHeight, block.Nonce))
+	tx.Del(r.formatNShare(block.RoundHeight, block.Nonce))
 	tx.ZRem(r.formatKey("blocks", "immature"), block.immatureKey)
 	tx.ZAdd(r.formatKey("blocks", "matured"), redis.Z{Score: float64(block.Height), Member: block.key()})
 }
@@ -578,6 +630,7 @@ func (r *RedisClient) GetMinerStats(login string, maxPayments int64) (map[string
 		tx.ZRevRangeWithScores(r.formatKey("payments", login), 0, maxPayments-1)
 		tx.ZCard(r.formatKey("payments", login))
 		tx.HGet(r.formatKey("shares", "roundCurrent"), login)
+		tx.LRange(r.formatKey("lastshares"), 0, r.pplns)
 		return nil
 	})
 
@@ -591,6 +644,15 @@ func (r *RedisClient) GetMinerStats(login string, maxPayments int64) (map[string
 		stats["paymentsTotal"] = cmds[2].(*redis.IntCmd).Val()
 		roundShares, _ := cmds[3].(*redis.StringCmd).Int64()
 		stats["roundShares"] = roundShares
+
+		lastnshares := cmds[4].(*redis.StringSliceCmd).Val()
+		nsh := 0
+		for _, val := range lastnshares {
+			if val == login {
+				nsh++
+			}
+		}
+		stats["lastNShares"] = nsh
 	}
 
 	return stats, nil
@@ -668,6 +730,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 		tx.ZCard(r.formatKey("blocks", "matured"))
 		tx.ZCard(r.formatKey("payments", "all"))
 		tx.ZRevRangeWithScores(r.formatKey("payments", "all"), 0, maxPayments-1)
+		tx.LLen(r.formatKey("lastshares"))
 		return nil
 	})
 
@@ -676,6 +739,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 	}
 
 	result, _ := cmds[2].(*redis.StringStringMapCmd).Result()
+	result["lastNShares"] = strconv.FormatInt(cmds[11].(*redis.IntCmd).Val(), 10)
 	stats["stats"] = convertStringMap(result)
 	candidates := convertCandidateResults(cmds[3].(*redis.ZSliceCmd))
 	stats["candidates"] = candidates

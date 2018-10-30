@@ -26,6 +26,7 @@ type UnlockerConfig struct {
 	Interval       string  `json:"interval"`
 	Daemon         string  `json:"daemon"`
 	Timeout        string  `json:"timeout"`
+	Pplns          int64
 }
 
 const minDepth = 16
@@ -448,12 +449,28 @@ func (u *BlockUnlocker) calculateRewards(block *storage.BlockData) (*big.Rat, *b
 	revenue := new(big.Rat).SetInt(block.Reward)
 	minersProfit, poolProfit := chargeFee(revenue, u.config.PoolFee)
 
-	shares, err := u.backend.GetRoundShares(block.RoundHeight, block.Nonce)
+	var shares map[string]int64
+	var err error
+	if u.config.Pplns > 0 {
+		shares, err = u.backend.GetNShares(block.RoundHeight, block.Nonce)
+	} else {
+		shares, err = u.backend.GetRoundShares(block.RoundHeight, block.Nonce)
+	}
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
 
-	rewards := calculateRewardsForShares(shares, block.TotalShares, minersProfit)
+	var rewards map[string]int64
+	if u.config.Pplns > 0 {
+		totalShares := int64(0)
+		for _, val := range shares {
+			totalShares += val
+		}
+
+		rewards = calculateRewardsForShares(shares, totalShares, minersProfit)
+	} else {
+		rewards = calculateRewardsForShares(shares, block.TotalShares, minersProfit)
+	}
 
 	if block.ExtraReward != nil {
 		extraReward := new(big.Rat).SetInt(block.ExtraReward)

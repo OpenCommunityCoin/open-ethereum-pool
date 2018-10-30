@@ -33,6 +33,7 @@ func startApi() {
 }
 
 func startBlockUnlocker() {
+	cfg.BlockUnlocker.Pplns = cfg.Pplns
 	u := payouts.NewBlockUnlocker(&cfg.BlockUnlocker, backend)
 	u.Start()
 }
@@ -82,7 +83,7 @@ func main() {
 
 	startNewrelic()
 
-	backend = storage.NewRedisClient(&cfg.Redis, cfg.Coin)
+	backend = storage.NewRedisClient(&cfg.Redis, cfg.Coin, cfg.Pplns)
 	pong, err := backend.Check()
 	if err != nil {
 		log.Printf("Can't establish connection to backend: %v", err)

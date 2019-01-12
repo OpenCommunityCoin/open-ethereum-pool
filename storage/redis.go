@@ -841,7 +841,7 @@ func (r *RedisClient) CollectStats(smallWindow time.Duration, maxBlocks, maxPaym
 		return nil
 	})
 
-	if err != nil {
+	if (err != nil) && (err != redis.Nil) {
 		return nil, err
 	}
 
